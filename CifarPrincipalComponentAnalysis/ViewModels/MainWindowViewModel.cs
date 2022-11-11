@@ -16,7 +16,7 @@ namespace CifarPrincipalComponentAnalysis.ViewModels
         private readonly Cifar10 _cifar10;
         private readonly Cifar100 _cifar100;
 
-        private string _title = "Image Principal Component Analysis";
+        private string _title = "Cifar10/Cifar100 Image Principal Component Analysis";
         public string Title
         {
             get => _title;
@@ -373,8 +373,8 @@ namespace CifarPrincipalComponentAnalysis.ViewModels
 
             if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK) {
                 _selectedPath = folderBrowserDialog.SelectedPath;
-                CustomMaterialDesignMessageBox.Show($"{_selectedPath} has been selected.");
                 SelectDatasetButtonContent = "Selected";
+                CustomMaterialDesignMessageBox.Show($"{_selectedPath} has been selected.");
             }
         }
 
