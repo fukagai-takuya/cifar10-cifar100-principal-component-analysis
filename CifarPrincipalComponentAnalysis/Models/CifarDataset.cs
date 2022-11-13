@@ -1,4 +1,4 @@
-//#define CHECK_PCA
+#define CHECK_PCA
 
 using Accord.Math;
 using Accord.Math.Decompositions;
@@ -8,7 +8,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Runtime.Serialization.Formatters.Binary;
 using System;
 using CifarPrincipalComponentAnalysis.Utilities;
 
@@ -175,10 +174,10 @@ namespace CifarPrincipalComponentAnalysis.Models
         private const string PCA_result_W_Accord_File = "PCA_result_W_Accord.bin";
         private const string PCA_result_V_Accord_File = "PCA_result_V_Accord.bin";
 
-        private double[] m_Mean;
-        private double[,] m_U;
-        private double[] m_W;
-        private double[,] m_V;
+        private double[] _vectorMean;
+        private double[,] _matrixU;
+        private double[] _vectorW;
+        private double[,] _matrixV;
 
         private string _selectedPath;
 
@@ -218,7 +217,9 @@ namespace CifarPrincipalComponentAnalysis.Models
             {
                 try
                 {
-                    m_Mean = (double[]) ReadDeserializedBinary(pca_Mean_File);
+                    byte[] byteArray = ReadByteArrayAsBinary(pca_Mean_File, ImageDataSize * sizeof(double));
+                    _vectorMean = new double[ImageDataSize];
+                    Buffer.BlockCopy(byteArray, 0, _vectorMean, 0, byteArray.Length);
                 }
                 catch (Exception ex)
                 {
@@ -232,7 +233,9 @@ namespace CifarPrincipalComponentAnalysis.Models
             {
                 try
                 {
-                    m_V = (double[,]) ReadDeserializedBinary(pca_V_File);
+                    byte[] byteArray = ReadByteArrayAsBinary(pca_V_File, ImageDataSize * ImageDataSize * sizeof(double));
+                    _matrixV = new double[ImageDataSize, ImageDataSize];
+                    Buffer.BlockCopy(byteArray, 0, _matrixV, 0, byteArray.Length);
                     PreparePcaFilterImages();
                 }
                 catch (Exception ex)
@@ -249,7 +252,9 @@ namespace CifarPrincipalComponentAnalysis.Models
             {
                 try
                 {
-                    m_W = (double[]) ReadDeserializedBinary(pca_W_File);
+                    byte[] byteArray = ReadByteArrayAsBinary(pca_W_File, ImageDataSize * sizeof(double));
+                    _vectorW = new double[ImageDataSize];
+                    Buffer.BlockCopy(byteArray, 0, _vectorW, 0, byteArray.Length);
                 }
                 catch (Exception ex)
                 {
@@ -263,7 +268,9 @@ namespace CifarPrincipalComponentAnalysis.Models
             {
                 try
                 {
-                    double[,] X_cov = (double[,]) ReadDeserializedBinary(debug_X_cov_File);
+                    byte[] byteArray = ReadByteArrayAsBinary(debug_X_cov_File, ImageDataSize * ImageDataSize * sizeof(double));
+                    double[,] X_cov = new double[ImageDataSize, ImageDataSize];
+                    Buffer.BlockCopy(byteArray, 0, X_cov, 0, byteArray.Length);
                 }
                 catch (Exception ex)
                 {
@@ -271,6 +278,25 @@ namespace CifarPrincipalComponentAnalysis.Models
                     return false;
                 }
             }
+
+            string pca_U_File = Path.Combine(selectedPath, PCA_result_U_Accord_File);
+            if (File.Exists(pca_U_File))
+            {
+                try
+                {
+                    byte[] byteArray = ReadByteArrayAsBinary(pca_U_File, ImageDataSize * ImageDataSize * sizeof(double));
+                    _matrixU = new double[ImageDataSize, ImageDataSize];
+                    Buffer.BlockCopy(byteArray, 0, _matrixU, 0, byteArray.Length);
+                    PreparePcaFilterImages();
+                }
+                catch (Exception ex)
+                {
+                    CustomMaterialDesignMessageBox.Show($"Failed to read a binary file({pca_U_File}). {ex}");
+                    return false;
+                }
+            }
+
+            double[,] UV = _matrixU.Transpose().Dot(_matrixV);
 
 #endif // CHECK_PCA
 
@@ -366,22 +392,22 @@ namespace CifarPrincipalComponentAnalysis.Models
                 image[3 * i + 1] = (double) imageData.GreenChannelData[i]; // green
                 image[3 * i + 2] = (double) imageData.RedChannelData[i]; // red
             }
-            image = image.Subtract(m_Mean);
+            image = image.Subtract(_vectorMean);
 
             double[] principalComponentScores = new double[SelectedNumberOfEigenvectors];
             for (int i = 0; i < SelectedNumberOfEigenvectors; i++)
             {
-                principalComponentScores[i] = image.Dot(m_V.GetColumn(i));
+                principalComponentScores[i] = image.Dot(_matrixV.GetColumn(i));
             }
 
             // double initial values are 0
             double[] imageRepsentedByEigenvectors = new double[ImageDataSize];
             for (int i = 0; i < SelectedNumberOfEigenvectors; i++)
             {
-                imageRepsentedByEigenvectors = imageRepsentedByEigenvectors.Add(m_V.GetColumn(i).Multiply(principalComponentScores[i]));
+                imageRepsentedByEigenvectors = imageRepsentedByEigenvectors.Add(_matrixV.GetColumn(i).Multiply(principalComponentScores[i]));
             }
 
-            imageRepsentedByEigenvectors = imageRepsentedByEigenvectors.Add(m_Mean);
+            imageRepsentedByEigenvectors = imageRepsentedByEigenvectors.Add(_vectorMean);
 
             for (int i = 0; i < ImageAreaSize; i++)
             {
@@ -444,44 +470,64 @@ namespace CifarPrincipalComponentAnalysis.Models
             }
 
             // column means
-            double[] m_Mean = X_input.Mean(dimension: 0);
-            SaveSerializedBinary(m_Mean, Path.Combine(_selectedPath, PCA_Mean_Accord_File));
+            _vectorMean = X_input.Mean(dimension: 0);
 
-            X_input = X_input.Subtract(m_Mean, dimension: (VectorType)0);
+            byte[] byteArray = new byte[_vectorMean.Length * sizeof(double)];
+            Buffer.BlockCopy(_vectorMean, 0, byteArray, 0, byteArray.Length);
+            SaveByteArrayAsBinary(Path.Combine(_selectedPath, PCA_Mean_Accord_File), byteArray);
+
+
+            X_input = X_input.Subtract(_vectorMean, dimension: (VectorType)0);
             double[,] X_cov = X_input.Transpose().Dot(X_input);
 
             X_input = null;
             GC.Collect();
-            SaveSerializedBinary(X_cov, Path.Combine(_selectedPath, Debug_X_cov_Accord_File));
+
+            byteArray = new byte[X_cov.Length * sizeof(double)];
+            Buffer.BlockCopy(X_cov, 0, byteArray, 0, byteArray.Length);
+            SaveByteArrayAsBinary(Path.Combine(_selectedPath, Debug_X_cov_Accord_File), byteArray);
+
 
             SingularValueDecomposition svd = new SingularValueDecomposition(X_cov);
 
-            m_U = svd.LeftSingularVectors;
-            m_W = svd.Diagonal;
-            m_V = svd.RightSingularVectors;
+            _matrixU = svd.LeftSingularVectors;
+            _vectorW = svd.Diagonal;
+            _matrixV = svd.RightSingularVectors;
 
-            SaveSerializedBinary(m_U, Path.Combine(_selectedPath, PCA_result_U_Accord_File));
-            SaveSerializedBinary(m_W, Path.Combine(_selectedPath, PCA_result_W_Accord_File));
-            SaveSerializedBinary(m_V, Path.Combine(_selectedPath, PCA_result_V_Accord_File));
+            byteArray = new byte[_matrixU.Length * sizeof(double)];
+            Buffer.BlockCopy(_matrixU, 0, byteArray, 0, byteArray.Length);
+            SaveByteArrayAsBinary(Path.Combine(_selectedPath, PCA_result_U_Accord_File), byteArray);
+
+            byteArray = new byte[_vectorW.Length * sizeof(double)];
+            Buffer.BlockCopy(_vectorW, 0, byteArray, 0, byteArray.Length);
+            SaveByteArrayAsBinary(Path.Combine(_selectedPath, PCA_result_W_Accord_File), byteArray);
+
+            byteArray = new byte[_matrixV.Length * sizeof(double)];
+            Buffer.BlockCopy(_matrixV, 0, byteArray, 0, byteArray.Length);
+            SaveByteArrayAsBinary(Path.Combine(_selectedPath, PCA_result_V_Accord_File), byteArray);
 
             PreparePcaFilterImages();
         }
 
-        private static void SaveSerializedBinary(object t, string path)
+        private static void SaveByteArrayAsBinary(string path, byte[] data)
         {
             using(Stream stream = File.Open(path, FileMode.Create))
             {
-                BinaryFormatter bformatter = new BinaryFormatter();
-                bformatter.Serialize(stream, t);
+                using(BinaryWriter binWriter = new BinaryWriter(stream))
+                {
+                    binWriter.Write(data);
+                }
             }
         }
 
-        private static object ReadDeserializedBinary(string path)
+        private static byte[] ReadByteArrayAsBinary(string path, int byteSize)
         {
             using(Stream stream = File.Open(path, FileMode.Open))
             {
-                BinaryFormatter bformatter = new BinaryFormatter();
-                return bformatter.Deserialize(stream);
+                using(BinaryReader binReader = new BinaryReader(stream))
+                {
+                    return binReader.ReadBytes(byteSize);
+                }
             }
         }
 
@@ -489,9 +535,9 @@ namespace CifarPrincipalComponentAnalysis.Models
         {
             _pcaFilters = new List<SmallImageData>();
 
-            for (int column = 0; column < m_V.Columns(); column++)
+            for (int column = 0; column < _matrixV.Columns(); column++)
             {
-                double[] eigenVector = m_V.GetColumn(column);
+                double[] eigenVector = _matrixV.GetColumn(column);
 
                 // change the range of the eigen vector values to display as the bitmaps: "Min: 0, Max: 255"
                 double minValue = eigenVector.Min();
