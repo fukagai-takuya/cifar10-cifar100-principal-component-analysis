@@ -296,7 +296,10 @@ namespace CifarPrincipalComponentAnalysis.Models
                 }
             }
 
-            double[,] UV = _matrixU.Transpose().Dot(_matrixV);
+            if (_matrixU != null && _matrixV != null)
+            {
+                double[,] UV = _matrixU.Transpose().Dot(_matrixV);
+            }
 
 #endif // CHECK_PCA
 
