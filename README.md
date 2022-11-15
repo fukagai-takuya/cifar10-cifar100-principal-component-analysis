@@ -8,4 +8,4 @@ This program reads Cifar10/Cifar100 datasets and applies Principal Component Ana
 
 Japanese Page
 
-https://github.com/fukagai-takuya/cifar10-cifar100-principal-component-analysis/
+https://www.leafwindow.com/cifar10-cifar100-principal-component-analysis-with-c-sharp/
