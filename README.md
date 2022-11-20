@@ -6,6 +6,10 @@ This program reads Cifar10/Cifar100 datasets and applies Principal Component Ana
 
 # about this program
 
+English Page
+
+https://www.leafwindow.com/en/cifar10-cifar100-principal-component-analysis-with-c-sharp-en/
+
 Japanese Page
 
 https://www.leafwindow.com/cifar10-cifar100-principal-component-analysis-with-c-sharp/
